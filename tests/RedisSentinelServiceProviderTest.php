@@ -2,24 +2,20 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests;
 
-use Illuminate\Cache\CacheServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
-use Illuminate\Foundation\Application;
-use Illuminate\Queue\QueueServiceProvider;
 use Illuminate\Redis\RedisManager;
-use Illuminate\Redis\RedisServiceProvider;
-use Illuminate\Session\SessionServiceProvider;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider;
+use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use PHPUnit_Framework_TestCase as TestCase;
 
 class RedisSentinelServiceProviderTest extends TestCase
 {
     /**
-     * An instance of the Laravel application container
+     * An instance of the Laravel or Lumen application container.
      *
-     * @var Application
+     * @var \Illuminate\Contracts\Container\Container
      */
     protected $app;
 
@@ -37,16 +33,9 @@ class RedisSentinelServiceProviderTest extends TestCase
      */
     public function setUp()
     {
-        $this->app = new Application();
+        $this->app = ApplicationFactory::make();
 
-        $this->app->config = new ConfigRepository(
-            require(__DIR__ . '/stubs/config.php')
-        );
-
-        $this->app->register(new CacheServiceProvider($this->app));
-        $this->app->register(new QueueServiceProvider($this->app));
-        $this->app->register(new RedisServiceProvider($this->app));
-        $this->app->register(new SessionServiceProvider($this->app));
+        $this->app->config->set(require(__DIR__ . '/stubs/config.php'));
 
         $this->provider = new RedisSentinelServiceProvider($this->app);
     }
@@ -57,6 +46,29 @@ class RedisSentinelServiceProviderTest extends TestCase
             RedisSentinelServiceProvider::class,
             $this->provider
         );
+    }
+
+    public function testLoadsDefaultConfiguration()
+    {
+        $config = new ConfigRepository();
+        $this->app->config = $config;
+
+        // The package only sets "session.connection" when "session.driver"
+        // equals "redis-sentinel"
+        if (! ApplicationFactory::isLumen()) {
+            $config->set('session.driver', 'redis-sentinel');
+        }
+
+        $this->provider->register();
+
+        $this->assertTrue($config->has('database.redis-sentinel'));
+        $this->assertTrue($config->has('database.redis.driver'));
+        $this->assertTrue($config->has('cache.stores.redis-sentinel'));
+        $this->assertTrue($config->has('queue.connections.redis-sentinel'));
+
+        if (! ApplicationFactory::isLumen()) {
+            $this->assertTrue($config->has('session.connection'));
+        }
     }
 
     public function testRegistersWithApplication()
@@ -83,6 +95,7 @@ class RedisSentinelServiceProviderTest extends TestCase
 
     public function testRegisterOverridesStandardRedisApi()
     {
+        $this->app->config->set('database.redis.driver', 'redis-sentinel');
         $this->provider->register();
         $this->provider->boot();
 
@@ -112,6 +125,10 @@ class RedisSentinelServiceProviderTest extends TestCase
         $this->provider->register();
         $this->provider->boot();
 
-        $this->assertNotNull($this->app->session->driver('redis-sentinel'));
+        if (ApplicationFactory::isLumen()) {
+            $this->assertFalse($this->app->bound('session'));
+        } else {
+            $this->assertNotNull($this->app->session->driver('redis-sentinel'));
+        }
     }
 }

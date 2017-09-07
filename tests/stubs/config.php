@@ -10,19 +10,19 @@ return [
     // Represents a subset of config/database.php
     'database' => [
         'redis' => [
-            'driver' => 'sentinel',
+            'driver' => 'redis-sentinel',
         ],
         'redis-sentinel' => [
             'connection1' => [
                 [
                     'host' => 'localhost',
-                    'port' => 6379,
+                    'port' => 26379,
                 ],
             ],
             'connection2' => [
                 [
                     'host' => 'localhost',
-                    'port' => 6379,
+                    'port' => 26379,
                 ],
                 'options' => [
                     'service' => 'another-master',
@@ -67,7 +67,8 @@ return [
                 'driver' => 'redis-sentinel',
                 'connection' => 'connection1',
                 'queue' => 'default',
-                'expire' => 60,
+                'retry_after' => 90,
+                'expire' => 90, // Legacy, Laravel < 5.4.30
             ],
         ],
     ],

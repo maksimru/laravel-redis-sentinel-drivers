@@ -4,8 +4,10 @@ namespace Monospice\LaravelRedisSentinel\Connectors;
 
 use Illuminate\Redis\Connections\PredisConnection;
 use Illuminate\Support\Arr;
+use Monospice\LaravelRedisSentinel\ReplicationDrivers\ManualReplication;
 use Monospice\SpicyIdentifiers\DynamicMethod;
 use Predis\Client;
+use Predis\Connection\Factory;
 
 /**
  * Initializes Predis Client instances for Redis Sentinel connections
@@ -56,10 +58,6 @@ class PredisConnector
         // connection-specific options
         $clientOpts = array_merge($options, Arr::pull($server, 'options', [ ]));
 
-        // Automatically set "replication" to "sentinel". This is the Sentinel
-        // driver, after all.
-        $clientOpts['replication'] = 'sentinel';
-
         // Extract the array of Sentinel connection options from the rest of
         // the client options
         $sentinelKeys = array_flip($this->sentinelConnectionOptionKeys);
@@ -69,6 +67,15 @@ class PredisConnector
         // the client options
         $specialKeys = array_flip($this->specialOptionKeys);
         $specialOpts = array_intersect_key($clientOpts, $specialKeys);
+
+        if(isset($specialOpts['master']) || isset($specialOpts['slaves'])) {
+            $clientOpts['replication'] = new ManualReplication($clientOpts['service'], $server['default'], new Factory());
+        }
+        else {
+            // Automatically set "replication" to "sentinel". This is the Sentinel
+            // driver, after all.
+            $clientOpts['replication'] = 'sentinel';
+        }
 
         // Filter the Sentinel connection options elements from the client
         // options array
@@ -106,30 +113,12 @@ class PredisConnector
                 ->callOn($connection, [ $value ]);
         }
 
-        // allow to reload master / slave configuration, useful with remote sentinel cluster
-        if(isset($specialOpts['master']) || isset($specialOpts['slaves'])){
-            $reflection = new \ReflectionObject($connection);
-            $connectionFactoryProperty = $reflection->getProperty('connectionFactory');
-            $connectionFactoryProperty->setAccessible(true);
-            $connectionFactory = $connectionFactoryProperty->getValue($connection);
-        }
-
         if(isset($specialOpts['master'])){
-            $masterProperty = $reflection->getProperty('master');
-            $masterProperty->setAccessible(true);
-            $masterProperty->setValue($connection, null);
-            $connection->add($connectionFactory->create(array_merge($specialOpts['master'],['alias' => 'master'])));
+            $connection->setMaster($specialOpts['master']);
         }
 
         if(isset($specialOpts['slaves'])){
-            $masterProperty = $reflection->getProperty('slaves');
-            $masterProperty->setAccessible(true);
-            $masterProperty->setValue($connection, []);
-            if(!is_array($specialOpts['slaves']))
-                $specialOpts['slaves'] = [$specialOpts['slaves']];
-            foreach($specialOpts['slaves'] as $index => $slave){
-                $connection->add($connectionFactory->create(array_merge($slave,['alias' => 'slave-'.$index])));
-            }
+            $connection->setSlaves($specialOpts['slaves']);
         }
 
         return $client;

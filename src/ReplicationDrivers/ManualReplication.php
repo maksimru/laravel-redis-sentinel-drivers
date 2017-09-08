@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\ReplicationDrivers;
 
+use Predis\Command\CommandInterface;
 use Predis\Connection\Aggregate\SentinelReplication;
 
 class ManualReplication extends SentinelReplication
@@ -12,23 +13,47 @@ class ManualReplication extends SentinelReplication
         $retries = 0;
 
         SENTINEL_RETRY: {
-            try {
-                $response = $this->getConnection($command)->$method($command);
-            } catch (CommunicationException $exception) {
-                $exception->getConnection()->disconnect();
+        try {
+            $response = $this->getConnection($command)->$method($command);
+        } catch (CommunicationException $exception) {
+            $exception->getConnection()->disconnect();
 
-                if ($retries == $this->retryLimit) {
-                    throw $exception;
-                }
-
-                usleep($this->retryWait * 1000);
-
-                ++$retries;
-                goto SENTINEL_RETRY;
+            if ($retries == $this->retryLimit) {
+                throw $exception;
             }
+
+            usleep($this->retryWait * 1000);
+
+            ++$retries;
+            goto SENTINEL_RETRY;
         }
+    }
 
         return $response;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function writeRequest(CommandInterface $command)
+    {
+        $this->retryCommandOnFailure($command, __FUNCTION__);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function readResponse(CommandInterface $command)
+    {
+        return $this->retryCommandOnFailure($command, __FUNCTION__);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function executeCommand(CommandInterface $command)
+    {
+        return $this->retryCommandOnFailure($command, __FUNCTION__);
     }
 
     public function setMaster($master){

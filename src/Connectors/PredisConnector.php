@@ -69,7 +69,7 @@ class PredisConnector
         $specialOpts = array_intersect_key($clientOpts, $specialKeys);
 
         if(isset($specialOpts['master']) || isset($specialOpts['slaves'])) {
-            $clientOpts['replication'] = new ManualReplication($clientOpts['service'], $server['default'], new Factory());
+            $clientOpts['replication'] = new ManualReplication($clientOpts['service'], $server, new Factory());
         }
         else {
             // Automatically set "replication" to "sentinel". This is the Sentinel

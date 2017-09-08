@@ -4,6 +4,7 @@ namespace Monospice\LaravelRedisSentinel\ReplicationDrivers;
 
 use Predis\Command\CommandInterface;
 use Predis\Connection\Aggregate\SentinelReplication;
+use Predis\Connection\NodeConnectionInterface;
 
 class ManualReplication extends SentinelReplication
 {
@@ -80,6 +81,44 @@ class ManualReplication extends SentinelReplication
         if ($this->slaves) {
             return array_values($this->slaves);
         }
+    }
+
+    /**
+     * Returns the connection instance in charge for the given command.
+     *
+     * @param CommandInterface $command Command instance.
+     *
+     * @return NodeConnectionInterface
+     */
+    private function getConnectionInternal(CommandInterface $command)
+    {
+        if (!$this->current) {
+            if ($this->strategy->isReadOperation($command) && $slave = $this->pickSlave()) {
+                $this->current = $slave;
+            } else {
+                $this->current = $this->getMaster();
+            }
+
+            return $this->current;
+        }
+
+        if ($this->current === $this->master) {
+            return $this->current;
+        }
+
+        if (!$this->strategy->isReadOperation($command)) {
+            $this->current = $this->getMaster();
+        }
+
+        return $this->current;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getConnection(CommandInterface $command)
+    {
+        return $this->getConnectionInternal($command);
     }
 
 }

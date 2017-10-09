@@ -123,6 +123,6 @@ class ManualReplication extends SentinelReplication
 
     public function setScriptReadOnly($script, $readonly = true)
     {
-        $this->strategy->setScriptReadOnly($script, $readonly = true);
+        $this->strategy->setScriptReadOnly($script, $readonly);
     }
 }

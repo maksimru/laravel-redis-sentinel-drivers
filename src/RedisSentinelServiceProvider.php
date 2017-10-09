@@ -3,15 +3,14 @@
 namespace Monospice\LaravelRedisSentinel;
 
 use Illuminate\Cache\CacheManager;
-use Illuminate\Cache\RedisStore;
-use Illuminate\Queue\QueueManager;
 use Illuminate\Queue\Connectors\RedisConnector;
+use Illuminate\Queue\QueueManager;
 use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
+use Monospice\LaravelRedisSentinel\CacheStore\SentinelStore;
 use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
-use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use Monospice\LaravelRedisSentinel\Manager;
 
 /**
@@ -134,7 +133,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
             $redis = $app->make('redis-sentinel')->getVersionedManager();
             $prefix = $app->make('config')->get('cache.prefix');
             $connection = Arr::get($conf, 'connection', 'default');
-            $store = new RedisStore($redis, $prefix, $connection);
+            $store = new SentinelStore($redis, $prefix, $connection);
 
             return $cache->repository($store);
         });

@@ -121,4 +121,8 @@ class ManualReplication extends SentinelReplication
         return $this->getConnectionInternal($command);
     }
 
+    public function setScriptReadOnly($script, $readonly = true)
+    {
+        $this->strategy->setScriptReadOnly($script, $readonly = true);
+    }
 }
